@@ -1,5 +1,8 @@
-env = gym.make("CarRacing-v2")
-agent = PPOAgent(env, config={'lr': 3e-4, 'batch_size': 128})
+import gymnasium as gym
+from stable_baselines3 import PPO
+
+env = gym.make("CarRacing-v2", render_mode="human")
+agent = PPO(env, config={'lr': 3e-4, 'batch_size': 128})
 
 state, _ = env.reset()
 episode_reward = 0
