@@ -15,8 +15,18 @@ class gym_Env_Wrapper:
     # screen = pygame.display.set_mode(window_size, pygame.RESIZABLE)
     # pygame.display.set_caption("Grayscale Image")
     
+    window_size = (150,150)
+    screen = pygame.display.set_mode(window_size, pygame.RESIZABLE)
+    pygame.display.set_caption("Car_racing")
+    
     def __init__(self,env,mini_render,initial_skip_frames, skip_frames, stack_frames, rescale_factor,stopping_bad_steps,stopping_time,stopping_steps):
         #need rescaled sisez
+        self.initial_skip = 50 #this env has some useless frames at the begining
+        self.step_counter = 0 # *4, to make a total of 1000 frames
+        self.max_steps = 250
+        self.frame_stack = deque(maxlen=stack_frames)
+        
+        
     def preprocess_state(self,state):
         gray_image = cv2.cvtColor(state, cv2.COLOR_RGB2GRAY) / 255.0
         if self.rescale_factor != 1.0:
@@ -49,19 +59,35 @@ class gym_Env_Wrapper:
             
             s = self.preprocess_state(s)
             self.frame_stack.append(s)
-                
             # ====================Stop Conditions========================
-            if terminal == True:
+            if (terminal == True) or (self.step_counter >= self.max_steps):
                 break
+        if(self.mini_render == True):    
+            self.display_image(self.frame_stack[0])
+        self.step_counter +=1
+        
+        return self.frame_stack, stack_reward
     
     def random_action(self):
+        return self.env.action_space.sample()
     
-    def current_frame_stack(self):
+    # def current_frame_stack(self):
     
     def env_state_shape(self):
+        return self.stack_frames,self.img_s_h,self.img_s_w
     
     def action_space(self):
+        return self.env.action_space
     
-    def action_space_size(self):
-    
-    def display_image(self, image_data):
+    def display_image(self, image_data): 
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return
+            
+        image_data = (image_data * 255).astype(np.uint8)
+        image_surface = pygame.surfarray.make_surface(np.stack([image_data]*3, axis=-1))
+        image_surface = pygame.transform.scale(image_surface, self.window_size)
+        self.screen.fill((0, 0, 0))
+        self.screen.blit(image_surface, (0, 0))
+        pygame.display.flip()
