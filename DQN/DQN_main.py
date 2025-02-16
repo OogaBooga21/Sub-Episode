@@ -1,21 +1,10 @@
-# import torch
-
-# # Create a tensor on the CPU
-# x = torch.randn(3, 3)
-
-# # Move the tensor to the GPU
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# x = x.to(device)
-# print(x)
-# print("DQN running on",torch.cuda.get_device_name(0))
-
-# from DQN_net import DQN
-# import numpy as np
+from DQN_agent import RL_Agent
+from DQN_env import gym_Env_Wrapper as gym_Wrapper
 import gym
 
 gamma = 0.95
-batch_size = 128
-memory_size = 1024
+batch_size = 64
+memory_size = 2048
 
 epsilon=1
 epsilon_decay = 3000
@@ -24,6 +13,18 @@ epsilon_min= 0.05
 skip_frames=4
 # target_update_freq = 1000  # Update target network every N steps
 rescale_factor = 1
-# mini_render = False
+mini_render =  True
+max_steps = 250
 
-car_racer = gym.make('CarRacing-v2', domain_randomise=True, continuous=False)
+car_racer = gym.make('CarRacing-v2', domain_randomize=False, continuous=False)
+
+env = gym_Wrapper(car_racer, mini_render, skip_frames, rescale_factor, max_steps)
+
+agent = RL_Agent(env, memory_size, gamma, epsilon, epsilon_decay, epsilon_min, batch_size)
+
+# agent.train(5000) #5000 * 250 = 1,250,000 steps
+# agent.test(5)
+
+
+agent.load_model(agent.network,"C:/Users/Oli/Documents/GitHub/Sub-Episode/best.pt")
+agent.test(10)

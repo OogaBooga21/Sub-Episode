@@ -32,20 +32,15 @@ class DQN(nn.Module):
             nn.Linear(256, self.output_layer_size)
         )
         
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.0002)
-        # self.scheduler = StepLR(self.optimizer, step_size=4000, gamma=0.5)
-        
-        self.to(self.device) # move to gpu
-        
-        print(self)
-        print("DQN running on ",torch.cuda.get_device_name(0)) #output whould be GPU name
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.0005)
         
     def forward(self, state):
-        batch_size, frame_stack_size, height, width = state.size()
         
-        conv_out = self.convolutions(state)
-        conv_out = conv_out.view(batch_size, -1)
-    
-        action_output = self.dnn(conv_out)
+        if state.ndim == 3: #if state is 3D, add a batch dimension
+            state = state.unsqueeze(0)
+        
+        conv_out = self.convolutions(state) #convolutional layers
+        flat = conv_out.view(state.shape[0], -1) #flatten the output
+        action_output = self.dnn(flat) #fully connected layers
         
         return action_output

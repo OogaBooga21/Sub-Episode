@@ -7,31 +7,37 @@ from PIL import Image
 import pygame
 
 class gym_Env_Wrapper:
-    # stopping_time = 0
-    # # stopping_reward = 0
-    # stopping_steps = 0
-    
-    # window_size = (150,150)
-    # screen = pygame.display.set_mode(window_size, pygame.RESIZABLE)
-    # pygame.display.set_caption("Grayscale Image")
     
     window_size = (150,150)
     screen = pygame.display.set_mode(window_size, pygame.RESIZABLE)
     pygame.display.set_caption("Car_racing")
     
-    def __init__(self,env,mini_render,initial_skip_frames, skip_frames, stack_frames, rescale_factor,stopping_bad_steps,stopping_time,stopping_steps):
-        #need rescaled sisez
+    def __init__(self,env,mini_render, stack_frames, rescale_factor,max_steps):
+        #need rescaled sisez\
+        self.observation_space = env.observation_space
+        self.action_space = env.action_space
+        self.env = env
+        self.mini_render = mini_render
+        self.rescale_factor = rescale_factor
         self.initial_skip = 50 #this env has some useless frames at the begining
-        self.step_counter = 0 # *4, to make a total of 1000 frames
-        self.max_steps = 250
+        self.step_counter = 0
+        self.max_steps = max_steps
+        self.stack_frames = stack_frames
         self.frame_stack = deque(maxlen=stack_frames)
         
         
+        dummy_state, _ = self.env.reset()
+        img_height = dummy_state.shape[0]
+        img_width = dummy_state.shape[1]
+        self.img_s_h = int(self.rescale_factor * img_height)
+        self.img_s_w = int(self.rescale_factor * img_width)
+        
+        
     def preprocess_state(self,state):
-        gray_image = cv2.cvtColor(state, cv2.COLOR_RGB2GRAY) / 255.0
+        gray_image = cv2.cvtColor(state, cv2.COLOR_RGB2GRAY)
         if self.rescale_factor != 1.0:
             gray_image = cv2.resize(gray_image, (self.img_s_h, self.img_s_w), interpolation=cv2.INTER_AREA)
-        return gray_image
+        return gray_image / 255.0
     
     def reset(self):
         s, _ = self.env.reset()
@@ -46,14 +52,14 @@ class gym_Env_Wrapper:
             
         self.episode_start_time = time.time()
         self.episode_reward = 0
-        self.episode_steps = 0
-        self.bad_step_counter = 0
+        self.step_counter = 0
         
-        return self.frame_stack
+        return np.stack(self.frame_stack,axis=0)
 
     def step(self, action):
         stack_reward = 0
-        for _ in range(self.skip_frames):
+        terminal = 0
+        for _ in range(self.stack_frames):
             s,r,terminal,truncated,info = self.env.step(action)    
             stack_reward+=r
             
@@ -61,23 +67,22 @@ class gym_Env_Wrapper:
             self.frame_stack.append(s)
             # ====================Stop Conditions========================
             if (terminal == True) or (self.step_counter >= self.max_steps):
+                terminal = 1
                 break
         if(self.mini_render == True):    
             self.display_image(self.frame_stack[0])
         self.step_counter +=1
         
-        return self.frame_stack, stack_reward
+        return np.stack(self.frame_stack,axis=0), stack_reward, terminal
     
     def random_action(self):
         return self.env.action_space.sample()
     
-    # def current_frame_stack(self):
+    # def env_state_shape(self):
+    #     return self.frame_stack.shape()
     
-    def env_state_shape(self):
-        return self.stack_frames,self.img_s_h,self.img_s_w
-    
-    def action_space(self):
-        return self.env.action_space
+    # def action_space(self):
+    #     return self.env.action_space
     
     def display_image(self, image_data): 
         for event in pygame.event.get():
