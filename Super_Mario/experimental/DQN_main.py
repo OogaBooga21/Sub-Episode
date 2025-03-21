@@ -1,0 +1,185 @@
+# from DQN_agent import RL_Agent
+# from DQN_env import gym_Env_Wrapper as gym_Wrapper
+# import gym
+# import gym_super_mario_bros
+# from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
+# from nes_py.wrappers import JoypadSpace
+
+# gamma = 0.90
+# batch_size = 128
+# memory_size = 30000
+
+# epsilon=1
+# epsilon_decay = 650
+# epsilon_min= 0.00
+
+# skip_frames=4
+# rescale_factor = 0.5
+# mini_render =  True
+# max_steps = 2200
+# target_update = 1000
+
+# # DEATH PARAMETERS
+# death_parameters = {
+#                     "death_memory_size": 8000,
+#                     "death_batch_size": 4,
+#                     "death_steps": 25,
+#                     "death_tries": 1,
+#                     "death_epsilon": 0.70 ## doesnt matter anymore
+#                     }
+# # death_memory_size = 16000
+# # death_steps = 50
+# # death_tries = 10
+# # death_epsilon = 0.70
+
+
+# smb= gym_super_mario_bros.make("SuperMarioBros-v0")
+# smb = JoypadSpace(smb, SIMPLE_MOVEMENT)
+
+# env = gym_Wrapper(smb, mini_render, skip_frames, rescale_factor, max_steps)
+
+# agent = RL_Agent(env, memory_size, gamma, epsilon, epsilon_decay, epsilon_min, batch_size, target_update, death_parameters)
+
+# agent.train(10000) #5000 * 250 = 1,250,000 steps
+# agent.test(5)
+
+
+# # agent.load_model(agent.online_network,"bestDDQN.pt")
+# # agent.test(10)
+
+import argparse
+import gym_super_mario_bros
+from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
+from nes_py.wrappers import JoypadSpace
+
+from DQN_env import gym_Env_Wrapper as gym_Wrapper
+# from DQN_agent import RL_Agent as DQN_agent
+from Double_DQN_agent import RL_Agent as Double_DQN_agent
+# from Dueling_DQN_agent import RL_Agent as Dueling_DQN_agent
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Train/test Super Mario agents.")
+    
+    # Which agent to train (DQN, Double_DQN, Dueling_DQN)
+    parser.add_argument("--training_algorithm", type=str, default="Double_DQN",
+                        choices=["DQN", "Double_DQN", "Dueling_DQN"],
+                        help="Which agent class to use for training.")
+    
+    # Common agent parameters
+    parser.add_argument("--gamma", type=float, default=0.99,
+                        help="Discount factor.")
+    parser.add_argument("--batch_size", type=int, default=8,
+                        help="Batch size.")
+    parser.add_argument("--memory_size", type=int, default=10,
+                        help="Replay memory size.")
+    parser.add_argument("--epsilon", type=float, default=1.0,
+                        help="Initial epsilon.")
+    parser.add_argument("--epsilon_decay", type=float, default=7000,
+                        help="Epsilon decay schedule.")
+    parser.add_argument("--epsilon_min", type=float, default=0.02,
+                        help="Minimum epsilon value.")
+    parser.add_argument("--update_freq", type=int, default=1000,
+                        help="Update frequency (used by some agents).")
+    parser.add_argument("--target_update", type=int, default=1000,
+                        help="Target network update frequency (Double_DQN only).")
+    parser.add_argument("--learning_rate", type=float, default=0.00025,
+                        help="Learning rate.")
+    parser.add_argument("--save_name", type=str, default="Double_DQN",
+                        help="Prefix/name for saved models/logs.")
+    
+    # Environment parameters
+    parser.add_argument("--skip_frames", type=int, default=4,
+                        help="Number of frames to skip.")
+    parser.add_argument("--mini_render", action="store_true",
+                        help="Enable mini rendering.")
+    parser.add_argument("--max_steps", type=int, default=90000,
+                        help="Maximum steps per episode.")
+    parser.add_argument("--rescale_factor", type=float, default=0.5,
+                        help="Rescale factor for the environment.")
+    
+    # Training settings
+    parser.add_argument("--train_episodes", type=int, default=15000,
+                        help="Number of training episodes.")
+    parser.add_argument("--test_episodes", type=int, default=5,
+                        help="Number of test episodes after training.")
+    
+    # Death parameters (only used in experimental agents)
+    parser.add_argument("--death_memory_size", type=int, default=8000,
+                        help="Memory size for 'death' experiences.")
+    parser.add_argument("--death_batch_size", type=int, default=4,
+                        help="Batch size for 'death' experiences.")
+    parser.add_argument("--death_steps", type=int, default=25,
+                        help="Extra steps for training upon 'death'.")
+    parser.add_argument("--death_tries", type=int, default=1,
+                        help="Number of attempts in 'death' scenario.")
+    parser.add_argument("--death_start_weights", 
+                        type=lambda s: list(map(float, s.split(','))),
+                        default=[0.4, 0.4, 0.2],
+                        help="Comma-separated starting weights for death (e.g., '0.4,0.4,0.2').")
+    parser.add_argument("--death_end_weights", 
+                        type=lambda s: list(map(float, s.split(','))),
+                        default=[0.7, 0.2, 0.1],
+                        help="Comma-separated ending weights for death (e.g., '0.7,0.2,0.1').")
+    parser.add_argument("--death_weights_ep_transition", type=int, default=650,
+                        help="Episode transition for death weight interpolation.")
+    
+    return parser.parse_args()
+
+def main():
+    args = parse_args()
+    
+    # Build agent parameters dictionary
+    agent_params = {
+        "gamma": args.gamma,
+        "batch_size": args.batch_size,
+        "memory_size": args.memory_size,
+        "epsilon": args.epsilon,
+        "epsilon_decay": args.epsilon_decay,
+        "epsilon_min": args.epsilon_min,
+        "update_freq": args.update_freq,
+        "target_update": args.target_update,
+        "learning_rate": args.learning_rate,
+        "save_name": args.save_name,
+    }
+    
+    # Build environment parameters dictionary
+    env_params = {
+        "skip_frames": args.skip_frames,
+        "mini_render": args.mini_render,
+        "max_steps": args.max_steps,
+        "rescale_factor": args.rescale_factor
+    }
+    
+    death_params = {
+        # Death parameters (agents that don't use them can ignore these)
+        "death_memory_size": args.death_memory_size,
+        "death_batch_size": args.death_batch_size,
+        "death_steps": args.death_steps,
+        "death_tries": args.death_tries,
+        "death_start_weights": args.death_start_weights,
+        "death_end_weights": args.death_end_weights,
+        "death_weights_ep_transition": args.death_weights_ep_transition
+    }
+    
+    # Create the Super Mario environment
+    smb = gym_super_mario_bros.make("SuperMarioBros-v0")
+    smb = JoypadSpace(smb, SIMPLE_MOVEMENT)
+    env = gym_Wrapper(smb, env_params)
+    
+    # Select the agent class based on the training_algorithm parameter
+    if args.training_algorithm == "DQN":
+        agent_class = DQN_agent
+    elif args.training_algorithm == "Double_DQN":
+        agent_class = Double_DQN_agent
+    elif args.training_algorithm == "Dueling_DQN":
+        agent_class = Dueling_DQN_agent
+    
+    # Instantiate the selected agent with the environment and parameters
+    agent = agent_class(env, agent_params, death_params)
+    
+    # Train and test the agent
+    agent.train(args.train_episodes)
+    agent.test(args.test_episodes)
+
+if __name__ == "__main__":
+    main()
