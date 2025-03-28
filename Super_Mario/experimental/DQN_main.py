@@ -53,36 +53,33 @@ from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 from nes_py.wrappers import JoypadSpace
 
 from DQN_env import gym_Env_Wrapper as gym_Wrapper
-# from DQN_agent import RL_Agent as DQN_agent
-from Double_DQN_agent import RL_Agent as Double_DQN_agent
-# from Dueling_DQN_agent import RL_Agent as Dueling_DQN_agent
+from DQN_agent import RL_Agent as DQN_agent
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train/test Super Mario agents.")
     
-    # Which agent to train (DQN, Double_DQN, Dueling_DQN)
     parser.add_argument("--training_algorithm", type=str, default="Double_DQN",
                         choices=["DQN", "Double_DQN", "Dueling_DQN"],
                         help="Which agent class to use for training.")
     
     # Common agent parameters
-    parser.add_argument("--gamma", type=float, default=0.99,
+    parser.add_argument("--gamma", type=float, default=0.90,
                         help="Discount factor.")
-    parser.add_argument("--batch_size", type=int, default=8,
+    parser.add_argument("--batch_size", type=int, default=32,
                         help="Batch size.")
-    parser.add_argument("--memory_size", type=int, default=10,
+    parser.add_argument("--memory_size", type=int, default=30000,
                         help="Replay memory size.")
     parser.add_argument("--epsilon", type=float, default=1.0,
                         help="Initial epsilon.")
-    parser.add_argument("--epsilon_decay", type=float, default=7000,
+    parser.add_argument("--epsilon_decay", type=float, default=500,
                         help="Epsilon decay schedule.")
-    parser.add_argument("--epsilon_min", type=float, default=0.02,
+    parser.add_argument("--epsilon_min", type=float, default=0.00,
                         help="Minimum epsilon value.")
     parser.add_argument("--update_freq", type=int, default=1000,
                         help="Update frequency (used by some agents).")
-    parser.add_argument("--target_update", type=int, default=1000,
-                        help="Target network update frequency (Double_DQN only).")
-    parser.add_argument("--learning_rate", type=float, default=0.00025,
+    # parser.add_argument("--target_update", type=int, default=1000,
+    #                     help="Target network update frequency (Double_DQN only).")
+    parser.add_argument("--learning_rate", type=float, default=0.0001,
                         help="Learning rate.")
     parser.add_argument("--save_name", type=str, default="Double_DQN",
                         help="Prefix/name for saved models/logs.")
@@ -90,15 +87,15 @@ def parse_args():
     # Environment parameters
     parser.add_argument("--skip_frames", type=int, default=4,
                         help="Number of frames to skip.")
-    parser.add_argument("--mini_render", action="store_true",
+    parser.add_argument("--mini_render", type=bool, default=True,
                         help="Enable mini rendering.")
     parser.add_argument("--max_steps", type=int, default=90000,
                         help="Maximum steps per episode.")
-    parser.add_argument("--rescale_factor", type=float, default=0.5,
-                        help="Rescale factor for the environment.")
+    # parser.add_argument("--rescale_factor", type=float, default=0.5,
+    #                     help="Rescale factor for the environment.")
     
     # Training settings
-    parser.add_argument("--train_episodes", type=int, default=15000,
+    parser.add_argument("--train_episodes", type=int, default=10000,
                         help="Number of training episodes.")
     parser.add_argument("--test_episodes", type=int, default=5,
                         help="Number of test episodes after training.")
@@ -123,6 +120,11 @@ def parse_args():
     parser.add_argument("--death_weights_ep_transition", type=int, default=650,
                         help="Episode transition for death weight interpolation.")
     
+    parser.add_argument("--continue_training", type=str, default=None, help="Continue training a model found inside the 'TrainModelResults' folder, by this name")
+    
+    parser.add_argument("--test_agent", type=str, default=None, help="Test a model found inside the 'TrainModelResults' folder, by this name")
+    parser.add_argument("--test_epsilon", type=float, default=0, help="Random actions in test")
+    
     return parser.parse_args()
 
 def main():
@@ -140,6 +142,7 @@ def main():
         "target_update": args.target_update,
         "learning_rate": args.learning_rate,
         "save_name": args.save_name,
+        "training_algorithm": args.training_algorithm
     }
     
     # Build environment parameters dictionary
@@ -147,7 +150,8 @@ def main():
         "skip_frames": args.skip_frames,
         "mini_render": args.mini_render,
         "max_steps": args.max_steps,
-        "rescale_factor": args.rescale_factor
+        "env_name": args.save_name
+        # "rescale_factor": args.rescale_factor
     }
     
     death_params = {
@@ -161,25 +165,23 @@ def main():
         "death_weights_ep_transition": args.death_weights_ep_transition
     }
     
-    # Create the Super Mario environment
     smb = gym_super_mario_bros.make("SuperMarioBros-v0")
     smb = JoypadSpace(smb, SIMPLE_MOVEMENT)
     env = gym_Wrapper(smb, env_params)
     
-    # Select the agent class based on the training_algorithm parameter
-    if args.training_algorithm == "DQN":
-        agent_class = DQN_agent
-    elif args.training_algorithm == "Double_DQN":
-        agent_class = Double_DQN_agent
-    elif args.training_algorithm == "Dueling_DQN":
-        agent_class = Dueling_DQN_agent
+    agent_class = DQN_agent
+    agent = agent_class(env, agent_params,death_params)
     
-    # Instantiate the selected agent with the environment and parameters
-    agent = agent_class(env, agent_params, death_params)
-    
-    # Train and test the agent
-    agent.train(args.train_episodes)
-    agent.test(args.test_episodes)
+    if(args.test_agent is None):
+        if(args.continue_training is not None):
+            agent.load_model(args.continue_training)
+            print("Loaded: ", args.continue_training)
+        agent.train(args.train_episodes)
+        agent.test(args.test_episodes)
+    else:
+        agent.load_model(args.test_agent)
+        agent.epsilon = args.test_epsilon
+        agent.test(args.test_episodes)
 
 if __name__ == "__main__":
     main()

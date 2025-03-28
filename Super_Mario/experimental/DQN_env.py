@@ -32,6 +32,7 @@ class gym_Env_Wrapper:
         # self.img_s_h = int(self.rescale_factor * img_height)
         # self.img_s_w = int(self.rescale_factor * img_width)
         self.img_s_w = 84
+        pygame.display.set_caption(env_params["env_name"])
         
         
     def preprocess_state(self,state):

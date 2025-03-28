@@ -46,3 +46,21 @@ class DQN(nn.Module):
         action_output = self.dnn(flat) #fully connected layers
         
         return action_output
+    
+    def duel_forward(self, state):
+        
+        if state.ndim == 3: #if state is 3D, add a batch dimension
+            state = state.unsqueeze(0)
+        
+        conv_out = self.convolutions(state) #convolutional layers
+        
+        
+        # flat = conv_out.view(state.shape[0], -1) #flatten the output
+        # action_output = self.dnn(flat) #fully connected layers        
+        # return action_output
+        
+        value  = self.value(conv_out.view(state.shape[0], -1))
+        advantage = self.advantage(conv_out.view(state.shape[0], -1))
+        
+        q_values = value + (advantage - advantage.mean(dim=1, keepdim=True))
+        return q_values
