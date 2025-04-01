@@ -139,7 +139,7 @@ def main():
         "epsilon_decay": args.epsilon_decay,
         "epsilon_min": args.epsilon_min,
         "update_freq": args.update_freq,
-        "target_update": args.target_update,
+        # "target_update": args.target_update,
         "learning_rate": args.learning_rate,
         "save_name": args.save_name,
         "training_algorithm": args.training_algorithm
