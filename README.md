@@ -224,7 +224,7 @@ When run, the program will output some important information to the console:
   Time:               18:30:51
   ------------------------------
   ```
-###Logging
+### Logging
 This program uses tensorboard for logging, and all logs will be found in the "TrainLogs" folder (will be automatically generated if it doesn't already exist). To view the logs; just open a terminal in the project's folder and run:
 ```bash
 tensorboard --logdir=TrainLogs
